@@ -110,7 +110,18 @@ router.post('/:id/invite', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'User already in board' });
     }
 
+    // Ensure board.members array exists
+    if (!board.members) {
+      board.members = [];
+    }
+
     board.members.push(userToInvite._id);
+
+    // Ensure user boards array exists
+    if (!userToInvite.boards) {
+      userToInvite.boards = [];
+    }
+
     userToInvite.boards.push(board._id);
 
     await board.save();
@@ -136,6 +147,11 @@ router.post('/:boardId/lists', authenticateToken, async (req, res) => {
         !board.members.some((m) => m._id.toString() === req.user.id))
     ) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Ensure board.lists array exists
+    if (!board.lists) {
+      board.lists = [];
     }
 
     const listCount = await List.countDocuments({ board: boardId });
@@ -191,6 +207,11 @@ router.post(
       });
 
       await card.save();
+
+      // Ensure list.cards array exists
+      if (!list.cards) {
+        list.cards = [];
+      }
 
       list.cards.push(card._id);
       await list.save();
