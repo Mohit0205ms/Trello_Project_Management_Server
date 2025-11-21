@@ -15,10 +15,10 @@ mongoose.connect(process.env.MONGO_URI, {
   useUnifiedTopology: true,
 }).then(() => console.log('MongoDB connected'));
 
+app.get("/", (req, res) => {
+  res.json({ message: "Hello from /" });
+});
 app.use('/api/auth', authRoutes.router);
 app.use('/api/boards', boardRoutes);
-app.use('/', (req,res) => {
-  console.log(req.originalUrl);
-})
 const PORT = process.env.PORT || 4000;
 app.listen(PORT, () => console.log(`Server running on ${PORT}`));
