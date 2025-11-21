@@ -7,7 +7,6 @@ const User = require('../models/User');
 
 const router = express.Router();
 
-// Get all boards for the current user
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const boards = await Board.find({
@@ -23,7 +22,6 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Create a new board
 router.post('/', authenticateToken, async (req, res) => {
   const { name, description } = req.body;
 
@@ -37,7 +35,6 @@ router.post('/', authenticateToken, async (req, res) => {
 
     await board.save();
 
-    // Add board to user's boards
     await User.findByIdAndUpdate(req.user.id, {
       $push: { boards: board._id },
     });
@@ -49,7 +46,6 @@ router.post('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get a specific board
 router.get('/:id', authenticateToken, async (req, res) => {
   try {
     const board = await Board.findById(req.params.id)
@@ -70,7 +66,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
       return res.status(404).json({ message: 'Board not found' });
     }
 
-    // Check if user has access
     if (
       board.owner.toString() !== req.user.id &&
       !board.members.some((m) => m._id.toString() === req.user.id)
@@ -85,7 +80,6 @@ router.get('/:id', authenticateToken, async (req, res) => {
   }
 });
 
-// Invite user to board
 router.post('/:id/invite', authenticateToken, async (req, res) => {
   const { email } = req.body;
 
@@ -110,14 +104,12 @@ router.post('/:id/invite', authenticateToken, async (req, res) => {
       return res.status(400).json({ message: 'User already in board' });
     }
 
-    // Ensure board.members array exists
     if (!board.members) {
       board.members = [];
     }
 
     board.members.push(userToInvite._id);
 
-    // Ensure user boards array exists
     if (!userToInvite.boards) {
       userToInvite.boards = [];
     }
@@ -134,7 +126,6 @@ router.post('/:id/invite', authenticateToken, async (req, res) => {
   }
 });
 
-// Create a list in a board
 router.post('/:boardId/lists', authenticateToken, async (req, res) => {
   const { boardId } = req.params;
   const { name } = req.body;
@@ -149,7 +140,6 @@ router.post('/:boardId/lists', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Ensure board.lists array exists
     if (!board.lists) {
       board.lists = [];
     }
@@ -173,7 +163,6 @@ router.post('/:boardId/lists', authenticateToken, async (req, res) => {
   }
 });
 
-// Create a card in a list
 router.post(
   '/:boardId/lists/:listId/cards',
   authenticateToken,
@@ -208,7 +197,6 @@ router.post(
 
       await card.save();
 
-      // Ensure list.cards array exists
       if (!list.cards) {
         list.cards = [];
       }
@@ -228,7 +216,6 @@ router.post(
   },
 );
 
-// Move card to different list
 router.patch('/cards/:id/move', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { newListId, position } = req.body;
@@ -254,7 +241,6 @@ router.patch('/cards/:id/move', authenticateToken, async (req, res) => {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Update lists
     await List.findByIdAndUpdate(oldList._id, {
       $pull: { cards: card._id },
     });
@@ -263,7 +249,6 @@ router.patch('/cards/:id/move', authenticateToken, async (req, res) => {
       $push: { cards: card._id },
     });
 
-    // Update card
     card.list = newListId;
     card.position = position || 0;
     await card.save();
@@ -274,152 +259,6 @@ router.patch('/cards/:id/move', authenticateToken, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
-
-// router.get('/:id/recommendations', authenticateToken, async (req, res) => {
-//   try {
-//     const board = await Board.findById(req.params.id)
-//       .populate({
-//         path: 'lists',
-//         populate: {
-//           path: 'cards'
-//         }
-//       });
-
-//     if (!board || (board.owner.toString() !== req.user.id && !board.members.some(m => m._id.toString() === req.user.id))) {
-//       return res.status(403).json({ message: 'Access denied' });
-//     }
-
-//     const recommendations = {
-//       dueDates: [],
-//       movements: [],
-//       related: []
-//     };
-
-//     // Get all cards
-//     const allCards = [];
-//     board.lists.forEach(list => {
-//       allCards.push(...list.cards);
-//     });
-
-//     // Keywords and patterns
-//     const urgentWords = /\b(urgent|asap|deadline|emergency|critical)\b/i;
-//     const startWords = /\b(start|begin|working|implement|develop)\b/i;
-//     const finishWords = /\b(done|finished|completed|ready|complete)\b/i;
-//     const pendingWords = /\b(pending|waiting|on hold)\b/i;
-//     const stuckWords = /\b(stuck|blocked|issue|problem)\b/i;
-
-//     // Date suggestions
-//     const datePatterns = [
-//       { pattern: /\b(today|tonight)\b/i, days: 0 },
-//       { pattern: /\b(tomorrow|tom)\b/i, days: 1 },
-//       { pattern: /\b(next week|next monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i, days: 7 },
-//       { pattern: /\b(this week)\b/i, days: 3 },
-//       { pattern: /\b(next month)\b/i, days: 30 }
-//     ];
-
-//     allCards.forEach(card => {
-//       const content = (card.title + ' ' + card.description).toLowerCase();
-
-//       // Due date suggestions
-//       if (!card.dueDate) {
-//         if (urgentWords.test(content)) {
-//           const suggestedDate = new Date();
-//           suggestedDate.setDate(suggestedDate.getDate() + 1); // Tomorrow for urgent
-//           recommendations.dueDates.push({
-//             cardId: card._id,
-//             cardTitle: card.title,
-//             suggestedDate,
-//             reason: 'Urgent keywords detected'
-//           });
-//         } else {
-//           datePatterns.forEach(({ pattern, days }) => {
-//             if (pattern.test(content)) {
-//               const suggestedDate = new Date();
-//               suggestedDate.setDate(suggestedDate.getDate() + days);
-//               recommendations.dueDates.push({
-//                 cardId: card._id,
-//                 cardTitle: card.title,
-//                 suggestedDate,
-//                 reason: `Date mention detected: "${pattern.source.replace(/\\b|\\/g, '')}"`
-//               });
-//             }
-//           });
-//         }
-//       }
-
-//       // List movement suggestions
-//       const currentListIndex = board.lists.findIndex(l => l.cards.some(c => c._id.toString() === card._id.toString()));
-//       const currentList = board.lists[currentListIndex];
-
-//       if (startWords.test(content) && currentList.name.toLowerCase() !== 'in progress') {
-//         const targetList = board.lists.find(l => l.name.toLowerCase() === 'in progress' || l.name.toLowerCase() === 'doing');
-//         if (targetList) {
-//           recommendations.movements.push({
-//             cardId: card._id,
-//             cardTitle: card.title,
-//             fromList: currentList.name,
-//             toList: targetList.name,
-//             reason: 'Card mentions starting work'
-//           });
-//         }
-//       } else if (finishWords.test(content) && !currentList.name.toLowerCase().includes('done')) {
-//         const targetList = board.lists.find(l => l.name.toLowerCase().includes('done') || l.name.toLowerCase().includes('complete'));
-//         if (targetList) {
-//           recommendations.movements.push({
-//             cardId: card._id,
-//             cardTitle: card.title,
-//             fromList: currentList.name,
-//             toList: targetList.name,
-//             reason: 'Card mentions completion'
-//           });
-//         }
-//       } else if (stuckWords.test(content)) {
-//         recommendations.movements.push({
-//           cardId: card._id,
-//           cardTitle: card.title,
-//           fromList: currentList.name,
-//           toList: 'Blocked',
-//           reason: 'Card mentions being stuck',
-//           suggestion: 'Consider creating a "Blocked" list'
-//         });
-//       }
-//     });
-
-//     // Related cards suggestions
-//     for (let i = 0; i < allCards.length; i++) {
-//       for (let j = i + 1; j < allCards.length; j++) {
-//         const card1 = allCards[i];
-//         const card2 = allCards[j];
-
-//         const words1 = (card1.title + ' ' + card1.description)
-//           .toLowerCase()
-//           .split(/\s+/)
-//           .filter(word => word.length > 2 && !['the', 'and', 'are', 'but', 'not', 'for', 'with', 'you', 'this', 'that'].includes(word));
-
-//         const words2 = (card2.title + ' ' + card2.description)
-//           .toLowerCase()
-//           .split(/\s+/)
-//           .filter(word => word.length > 2 && !['the', 'and', 'are', 'but', 'not', 'for', 'with', 'you', 'this', 'that'].includes(word));
-
-//         const commonWords = words1.filter(word => words2.includes(word));
-
-//         if (commonWords.length >= 3) {
-//           recommendations.related.push({
-//             card1: { id: card1._id, title: card1.title },
-//             card2: { id: card2._id, title: card2.title },
-//             commonWords: commonWords.slice(0, 5), // Show first 5 common words
-//             reason: 'Shared significant keywords'
-//           });
-//         }
-//       }
-//     }
-
-//     res.json({ recommendations });
-//   } catch (error) {
-//     console.error(error);
-//     res.status(500).json({ message: 'Server error' });
-//   }
-// });
 
 router.get('/:id/recommendations', authenticateToken, async (req, res) => {
   try {
@@ -445,7 +284,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
       status: [],
     };
 
-    // Get all cards
     const allCards = [];
     board.lists.forEach((list) => {
       allCards.push(...list.cards);
@@ -454,7 +292,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
     const now = new Date();
 
     allCards.forEach((card) => {
-      // Priority-based recommendations
       if (card.priority === 'Critical') {
         const criticalList = board.lists.find((l) =>
           l.name.toLowerCase().includes('in progress'),
@@ -497,13 +334,11 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
         }
       }
 
-      // Due date-based recommendations
       if (card.dueDate) {
         const dueDate = new Date(card.dueDate);
         const daysUntilDue = Math.ceil((dueDate - now) / (1000 * 60 * 60 * 24));
 
         if (daysUntilDue < 0) {
-          // Overdue
           if (card.status !== 'Done') {
             recommendations.dueDate.push({
               cardId: card._id,
@@ -520,7 +355,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
             });
           }
         } else if (daysUntilDue <= 2) {
-          // Due soon (next 2 days)
           if (card.status !== 'Done' && card.status !== 'In Progress') {
             recommendations.dueDate.push({
               cardId: card._id,
@@ -532,7 +366,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
             });
           }
         } else if (daysUntilDue <= 7 && card.status === 'Backlog') {
-          // Due within a week but still in backlog
           recommendations.dueDate.push({
             cardId: card._id,
             cardTitle: card.title,
@@ -543,7 +376,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
           });
         }
       } else {
-        // No due date set
         if (card.priority === 'Critical' || card.priority === 'High') {
           recommendations.dueDate.push({
             cardId: card._id,
@@ -556,14 +388,12 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
         }
       }
 
-      // Status-based recommendations
       const currentListIndex = board.lists.findIndex((l) =>
         l.cards.some((c) => c._id.toString() === card._id.toString()),
       );
       const currentList = board.lists[currentListIndex];
 
       if (card.status === 'In Progress') {
-        // Tasks in progress
         if (card.dueDate) {
           const dueDate = new Date(card.dueDate);
           const daysUntilDue = Math.ceil(
@@ -593,7 +423,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
       }
 
       if (card.status === 'Blocked') {
-        // Blocked tasks
         recommendations.status.push({
           cardId: card._id,
           cardTitle: card.title,
@@ -605,7 +434,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
       }
 
       if (card.status === 'Todo' && card.priority === 'Critical') {
-        // Critical tasks in Todo
         recommendations.status.push({
           cardId: card._id,
           cardTitle: card.title,
@@ -616,7 +444,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
         });
       }
 
-      // List movement suggestions based on status
       if (
         card.status === 'Done' &&
         !currentList.name.toLowerCase().includes('done')
@@ -639,7 +466,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
       }
     });
 
-    // Compile all recommendations
     const allRecommendations = [
       ...recommendations.alerts,
       ...recommendations.priority,
@@ -657,7 +483,6 @@ router.get('/:id/recommendations', authenticateToken, async (req, res) => {
   }
 });
 
-// Update card route (for edits)
 router.patch('/cards/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const updates = req.body;
