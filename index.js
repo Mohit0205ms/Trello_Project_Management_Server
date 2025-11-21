@@ -20,5 +20,11 @@ app.get("/", (req, res) => {
 });
 app.use('/api/auth', authRoutes.router);
 app.use('/api/boards', boardRoutes);
+
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+
+if (process.env.VERCEL) {
+  module.exports = app;
+} else {
+  app.listen(PORT, () => console.log(`Server running on ${PORT}`));
+}
